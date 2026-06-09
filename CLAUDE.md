@@ -18,7 +18,6 @@
 
 ```bash
 # .env 文件（项目根目录）
-ANTHROPIC_API_KEY=sk-kimi-CUhFc7KruaxB8A33zFN5ukQscIXdPUrGWQJwzbJeEsOD2EsIGpk2dQf0RyVEZFhe
 ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
 ```
 
