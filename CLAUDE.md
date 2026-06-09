@@ -24,7 +24,7 @@ ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
 ## 运行方式
 
 ```bash
-cd /Users/liang/Downloads/韭
+cd /Users/coronin/Downloads/韭
 
 # 安装依赖
 pip install -r requirements.txt
