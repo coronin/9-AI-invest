@@ -45,12 +45,13 @@ python -m src.cli -i "当前宏观环境怎么样" -f "朋友说全仓买入了"
 ├── requirements.txt                # Python 依赖
 ├── src/
 │   ├── __init__.py
-│   ├── prompts.py    (1213行)     # 16个节点的完整 prompt
+│   ├── prompts.py    (1300+行)    # 16个节点的完整 prompt
 │   ├── memory.py     (243行)      # 历史战绩读写 + 胜率分析
 │   ├── storage.py    (144行)      # 决策记录卡存储
 │   ├── data_fetcher.py (116行)    # Yfinance 数据获取
-│   ├── team.py       (730行)      # CrewAI 团队定义（14个agent）
-│   └── cli.py        (131行)      # CLI 交互入口
+│   ├── tools.py      (150+行)     # CrewAI Tools（股票数据获取）
+│   ├── team.py       (750+行)     # CrewAI 团队定义（14个agent）
+│   └── cli.py        (140+行)     # CLI 交互入口
 ├── data/
 │   ├── history.md                   # 历史战绩库
 │   └── decisions/                   # 决策记录卡目录
@@ -91,6 +92,16 @@ python -m src.cli -i "当前宏观环境怎么样" -f "朋友说全仓买入了"
 ### 3. tushane 包不存在
 **问题**: PyPI 上没有 tushane 包
 **解决**: 从 requirements.txt 中移除，仅保留 yfinance
+
+### 4. Task description 未使用完整 prompt（导致 Agent 幻觉）
+**问题**: `create_crew()` 中 Task 的 description 只是简短标题，没有传入 `prompts.py` 的完整 prompt
+**影响**: Agent 收到简短任务描述，不包含工具使用说明，导致编造虚拟数据
+**解决**: Alpha/Risk/Quinn 的 Task description改用 `get_xxx_prompt(user_input)` 生成完整 prompt
+**影响范围**: 仅影响需要外部数据的 Agent（Alpha、Risk、Quinn）
+
+### 5.任务 context 依赖顺序错误
+**问题**: Critic 等任务先创建，但简单路径下 context 引用了后创建的 simple_alpha_task
+**解决**: 重构为两个独立分支（复杂路径/简单路径），避免 context 引用未来任务
 
 ## 依赖说明
 

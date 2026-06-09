@@ -40,6 +40,10 @@ from src.prompts import (
 )
 from src.memory import MemoryReader
 from src.storage import save_decision_card, get_history_content
+from src.tools import get_stock_info_tool, get_stock_history_tool, get_stock_performance_tool
+
+# ---- 需要外部数据的 Agent 工具列表 ----
+stock_tools = [get_stock_info_tool, get_stock_history_tool, get_stock_performance_tool]
 
 
 # =============================================================================
@@ -191,9 +195,11 @@ alpha = Agent(
     backstory=(
         "你是覆盖全球股票市场的顶级个股分析师，曾连续多年被机构投资者评为"
         "最佳分析师。你的估值框架兼顾成长性和确定性，深受专业投资者信赖。"
+        "你擅长使用外部数据工具获取实时行情和公司信息。"
     ),
     verbose=True,
     llm=llm,
+    tools=stock_tools,
 )
 
 risk = Agent(
@@ -202,9 +208,11 @@ risk = Agent(
     backstory=(
         "你是专业投资组合风险管理专家，精通MPT、现代投资组合理论和"
         "风险因子模型。你帮助机构投资者管理了数十亿资产的风险敞口。"
+        "你会用外部数据工具获取持仓股票的最新行情和风险指标。"
     ),
     verbose=True,
     llm=llm,
+    tools=stock_tools,
 )
 
 otto = Agent(
@@ -226,9 +234,11 @@ quinn = Agent(
         "你是顶级量化策略经理，精通Python、统计分析和量化回测框架。"
         "你设计的策略曾在实盘中创造过显著超额收益。你同时具备"
         "扎实的金融理论功底和卓越的编程实现能力。"
+        "你使用外部数据工具获取历史价格进行策略回测。"
     ),
     verbose=True,
     llm=llm,
+    tools=stock_tools,
 )
 
 # ---- 情绪链路 · 3个节点 ----
@@ -407,9 +417,9 @@ def create_crew(
 
     if trigger_alpha:
         alpha_task = Task(
-            description="Alpha任务：个股/基金基本面、估值、技术面分析",
+            description=get_alpha_prompt(user_input),
             agent=alpha,
-            expected_output="个股分析报告，包含基本面/估值/技术面综合评级",
+            expected_output="个股分析报告，包含基本面/估值/技术面综合评级，必须包含真实数据而非虚构",
         )
         alpha_task.context = [money_task]
         analyst_tasks.append(alpha_task)
@@ -417,9 +427,9 @@ def create_crew(
 
     if trigger_risk:
         risk_task = Task(
-            description="Risk任务：持仓组合风险诊断和压力测试",
+            description=get_risk_prompt(user_input),
             agent=risk,
-            expected_output="风险诊断报告，包含六维风险评估和压力测试结果",
+            expected_output="风险诊断报告，包含六维风险评估和压力测试结果，必须基于真实数据",
         )
         risk_task.context = [money_task]
         analyst_tasks.append(risk_task)
@@ -437,9 +447,9 @@ def create_crew(
 
     if trigger_quinn:
         quinn_task = Task(
-            description="Quinn任务：量化策略设计和回测代码生成",
+            description=get_quinn_prompt(user_input),
             agent=quinn,
-            expected_output="量化策略说明和完整Python回测代码",
+            expected_output="量化策略说明和完整Python回测代码，必须包含真实数据获取方式",
         )
         quinn_task.context = [money_task]
         analyst_tasks.append(quinn_task)
@@ -484,63 +494,67 @@ def create_crew(
         emotion_tasks.append(sentiment_task)
         tasks.append(sentiment_task)
 
-    # --- 质检和汇总任务（顺序执行，在所有分析师之后）---
+    # ---- 根据是否有分析师触发，决定走哪个路径 ----
+    if analyst_tasks or emotion_tasks:
+        # 复杂路径：Critic 审查所有分析师输出
+        critic_context = [money_task] + analyst_tasks + emotion_tasks if emotion_tasks else [money_task] + analyst_tasks
+        critic_task = Task(
+            description="Critic任务：对抗性审查所有分析师输出，输出质量评分和改进建议",
+            agent=critic,
+            expected_output="质量审查报告，包含各分析师评分、逻辑漏洞和给CIO的裁决建议",
+        )
+        critic_task.context = critic_context
+        tasks.append(critic_task)
 
-    # Critic 任务：审查所有分析师输出
-    # 其 context 包含所有已触发的分析师任务
-    critic_context = [money_task] + analyst_tasks + emotion_tasks if emotion_tasks else [money_task] + analyst_tasks
-    critic_task = Task(
-        description="Critic任务：对抗性审查所有分析师输出，输出质量评分和改进建议",
-        agent=critic,
-        expected_output="质量审查报告，包含各分析师评分、逻辑漏洞和给CIO的裁决建议",
-    )
-    critic_task.context = critic_context
-    tasks.append(critic_task)
+        xiaocui_task = Task(
+            description="小翠任务：清洗内容格式，过滤废话，提取有效分析结论",
+            agent=xiaocui,
+            expected_output="清洗后的有效分析内容，只保留实质性结论",
+        )
+        xiaocui_task.context = [critic_task]
+        tasks.append(xiaocui_task)
 
-    # 小翠任务：清洗内容
-    xiaocui_task = Task(
-        description="小翠任务：清洗内容格式，过滤废话，提取有效分析结论",
-        agent=xiaocui,
-        expected_output="清洗后的有效分析内容，只保留实质性结论",
-    )
-    xiaocui_task.context = [critic_task]
-    tasks.append(xiaocui_task)
+        cio_task = Task(
+            description="CIO任务：整合所有有效分析，输出最终投资决策报告",
+            agent=cio,
+            expected_output="最终投资决策报告，包含市场环境、核心结论、行动建议和风险提示",
+        )
+        cio_task.context = [xiaocui_task]
+        tasks.append(cio_task)
 
-    # CIO任务：最终报告
-    cio_task = Task(
-        description="CIO任务：整合所有有效分析，输出最终投资决策报告",
-        agent=cio,
-        expected_output="最终投资决策报告，包含市场环境、核心结论、行动建议和风险提示",
-    )
-    cio_task.context = [xiaocui_task]
-    tasks.append(cio_task)
+        decision_card_task = Task(
+            description="决策记录卡任务：生成结构化决策记录并保存到本地",
+            agent=cio,
+            expected_output="决策记录卡，一行可直接粘贴进历史表格的记录",
+        )
+        decision_card_task.context = [cio_task]
+        tasks.append(decision_card_task)
 
-    # 决策记录卡任务
-    symbol = _extract_symbol(user_input)
-    today_str = date.today().isoformat()
-    decision_card_task = Task(
-        description="决策记录卡任务：生成结构化决策记录并保存到本地",
-        agent=cio,  # CIO同时生成决策记录
-        expected_output="决策记录卡，一行可直接粘贴进历史表格的记录",
-    )
-    decision_card_task.context = [cio_task]
-    tasks.append(decision_card_task)
-
-    # ---- 如果没有任何分析师触发（简单查询），走简化路径 ----
-    if not analyst_tasks and not emotion_tasks:
-        # 简单路径：只触发 Alpha 做一个基础分析
+    else:
+        # 简单路径：只有 Alpha 做基础分析，然后直接到 CIO
         simple_alpha_task = Task(
-            description="Alpha任务：个股/基金基础分析",
+            description=get_alpha_prompt(user_input),
             agent=alpha,
-            expected_output="个股基础分析报告",
+            expected_output="个股基础分析报告，必须包含真实数据",
         )
         simple_alpha_task.context = [money_task]
         tasks.append(simple_alpha_task)
 
-        critic_task.context = [money_task, simple_alpha_task]
-        xiaocui_task.context = [critic_task]
-        cio_task.context = [xiaocui_task]
+        cio_task = Task(
+            description="CIO任务：整合所有有效分析，输出最终投资决策报告",
+            agent=cio,
+            expected_output="最终投资决策报告，包含市场环境、核心结论、行动建议和风险提示",
+        )
+        cio_task.context = [money_task, simple_alpha_task]
+        tasks.append(cio_task)
+
+        decision_card_task = Task(
+            description="决策记录卡任务：生成结构化决策记录并保存到本地",
+            agent=cio,
+            expected_output="决策记录卡，一行可直接粘贴进历史表格的记录",
+        )
         decision_card_task.context = [cio_task]
+        tasks.append(decision_card_task)
 
     # ---- 创建 Crew（hierarchical 模式）----
     # manager_agent 不能在 agents 列表中
