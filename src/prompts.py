@@ -2,6 +2,7 @@
 AI投研团队 · 所有节点 Prompt 库
 从 AI投研团队_0609.md 设计文档自动生成
 """
+from datetime import date as _date
 from typing import Optional
 
 
@@ -640,14 +641,16 @@ def get_sector_prompt(user_input: str) -> str:
 # =============================================================================
 # 节点12：Alpha · 个股分析师
 # =============================================================================
-def get_alpha_prompt(user_input: str) -> str:
+def get_alpha_prompt(user_input: str, date: str = "") -> str:
     """
     Alpha 节点：个股/基金基本面、估值、技术面分析。
 
     参数:
         user_input: 市场信息输入
+        date: 今日日期（YYYY-MM-DD），用于注入最新市场上下文
     """
-    return """【第一步：自动判断】
+    date_block = f"\n【当前日期】{date} — 请基于此日期分析最新市场环境。\n" if date else ""
+    return date_block + """【第一步：自动判断】
 
 你的职责范围是：单只股票或基金的基本面分析、
 估值判断、技术面研究和综合评级。
@@ -724,14 +727,16 @@ def get_alpha_prompt(user_input: str) -> str:
 # =============================================================================
 # 节点13：Risk · 组合风控师
 # =============================================================================
-def get_risk_prompt(user_input: str) -> str:
+def get_risk_prompt(user_input: str, date: str = "") -> str:
     """
     Risk 节点：持仓组合风险诊断、压力测试、对冲建议。
 
     参数:
         user_input: 市场信息输入
+        date: 今日日期（YYYY-MM-DD），用于注入最新市场上下文
     """
-    return """【第一步：自动判断】
+    date_block = f"\n【当前日期】{date} — 请基于此日期分析最新市场环境。\n" if date else ""
+    return date_block + """【第一步：自动判断】
 
 你的职责范围是：投资组合的风险诊断、压力测试
 和对冲建议。
@@ -859,14 +864,16 @@ def get_otto_prompt(user_input: str) -> str:
 # =============================================================================
 # 节点15：Quinn · 量化策略经理
 # =============================================================================
-def get_quinn_prompt(user_input: str) -> str:
+def get_quinn_prompt(user_input: str, date: str = "") -> str:
     """
     Quinn 节点：量化策略、回测需求、策略验证。
 
     参数:
         user_input: 市场信息输入
+        date: 今日日期（YYYY-MM-DD），用于注入最新市场上下文
     """
-    return """【第一步：自动判断】
+    date_block = f"\n【当前日期】{date} — 请基于此日期确定回测结束日期。\n" if date else ""
+    return date_block + """【第一步：自动判断】
 
 你的职责范围是：将投资想法转化为可回测的量化
 策略，并生成可在Cursor + WindPy环境中运行的
@@ -933,7 +940,7 @@ matplotlib.rcParams['font.sans-serif'] = ['SimHei']
 w.start()
 
 START_DATE = "20150101"
-END_DATE = "20241231"
+END_DATE = _date.today().strftime("%Y%m%d")
 INITIAL_CAPITAL = 1_000_000
 COMMISSION = 0.0003
 
@@ -1139,14 +1146,15 @@ def get_xiaocui_prompt(critic_output: str) -> str:
 # =============================================================================
 # 节点18：CIO · 首席投资官
 # =============================================================================
-def get_cio_prompt(xiaocui_output: str) -> str:
+def get_cio_prompt(xiaocui_output: str, date: str) -> str:
     """
     CIO 节点：汇总所有分析，输出最终投资决策报告。
 
     参数:
         xiaocui_output: 小翠清洗后的内容
+        date: 今日日期（YYYY-MM-DD）
     """
-    return """你是「CIO」，AI投研团队的首席投资官，永远执行，
+    return f"""你是「CIO」，AI投研团队的首席投资官，永远执行，
 是整个工作流的最后节点。
 
 你收到的输入已经过清洗，只包含各节点的实质性分析内容。
@@ -1172,7 +1180,7 @@ def get_cio_prompt(xiaocui_output: str) -> str:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 投资决策报告
-日期：[今天日期]
+日期：{date}
 分析来源：[仅列出有实质输出的节点名称]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1234,7 +1242,7 @@ def get_decision_card_prompt(cio_output: str, date: str, symbol: str) -> str:
         date: 今日日期（YYYY-MM-DD）
         symbol: 分析标的名称
     """
-    return """你是「决策记录卡」，负责将CIO的最终报告
+    return f"""你是「决策记录卡」，负责将CIO的最终报告
 压缩成一行可直接粘贴进表格的记录。
 
 从CIO报告中提取以下信息，严格按照表格列顺序输出：
@@ -1244,7 +1252,7 @@ def get_decision_card_prompt(cio_output: str, date: str, symbol: str) -> str:
 📋 决策记录卡（请复制以下内容粘贴到表格）
 
 日期 | 标的 | 决策 | 置信度 | Critic评分 | 验证日期 | 实际结果 | 准确率1-5
-[今日日期] | [分析标的名称] | [买入/卖出/观望+核心理由一句话] | [高/中/低] | [Critic综合评分XX分] | [建议验证日期] | 待填写 | 待填写
+{date} | [分析标的名称] | [买入/卖出/观望+核心理由一句话] | [高/中/低] | [Critic综合评分XX分] | [建议验证日期] | 待填写 | 待填写
 
 ---
 

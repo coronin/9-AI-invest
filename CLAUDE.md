@@ -27,11 +27,12 @@ ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
 cd /Users/coronin/Downloads/韭
 
 # 安装依赖
-pip install -r requirements.txt
+python3 -m venv ./
+./bin/pip install -r requirements.txt
 
 # 运行
-python -m src.cli -i "帮我分析贵州茅台" -s "贵州茅台"
-python -m src.cli -i "当前宏观环境怎么样" -f "朋友说全仓买入了"
+./bin/python -m src.cli -i "帮我分析贵州茅台" -s "贵州茅台"
+./bin/python -m src.cli -i "当前宏观环境怎么样" -f "朋友说全仓买入了"
 ```
 
 ## 文件结构

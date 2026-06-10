@@ -351,6 +351,7 @@ def create_crew(
     user_input: str,
     fanizhi_input: str = "",
     memory_stats: str = "",
+    today_str: str = "",
 ) -> Crew:
     """
     根据 user_input 自动判断触发哪些节点，创建并返回配置好的 Crew 实例。
@@ -359,6 +360,7 @@ def create_crew(
         user_input: 市场信息输入
         fanizhi_input: 反指朋友的输入（选填）
         memory_stats: Memory 节点的历史战绩摘要（无数据时为空字符串）
+        today_str: 今日日期（YYYY-MM-DD），用于注入最新市场上下文
     """
     # ---- 判断触发条件 ----
     trigger_scout = _should_trigger_scout(user_input)
@@ -417,7 +419,7 @@ def create_crew(
 
     if trigger_alpha:
         alpha_task = Task(
-            description=get_alpha_prompt(user_input),
+            description=get_alpha_prompt(user_input, today_str),
             agent=alpha,
             expected_output="个股分析报告，包含基本面/估值/技术面综合评级，必须包含真实数据而非虚构",
         )
@@ -427,7 +429,7 @@ def create_crew(
 
     if trigger_risk:
         risk_task = Task(
-            description=get_risk_prompt(user_input),
+            description=get_risk_prompt(user_input, today_str),
             agent=risk,
             expected_output="风险诊断报告，包含六维风险评估和压力测试结果，必须基于真实数据",
         )
@@ -447,7 +449,7 @@ def create_crew(
 
     if trigger_quinn:
         quinn_task = Task(
-            description=get_quinn_prompt(user_input),
+            description=get_quinn_prompt(user_input, today_str),
             agent=quinn,
             expected_output="量化策略说明和完整Python回测代码，必须包含真实数据获取方式",
         )
@@ -533,7 +535,7 @@ def create_crew(
     else:
         # 简单路径：只有 Alpha 做基础分析，然后直接到 CIO
         simple_alpha_task = Task(
-            description=get_alpha_prompt(user_input),
+            description=get_alpha_prompt(user_input, today_str),
             agent=alpha,
             expected_output="个股基础分析报告，必须包含真实数据",
         )
@@ -598,8 +600,11 @@ def run_research(
             reader = MemoryReader(history_content)
             memory_stats = reader.get_summary_for_money()
 
+    # 计算今日日期，用于注入最新市场上下文
+    today_str = date.today().isoformat()
+
     # 创建 Crew
-    crew = create_crew(user_input, fanizhi_input, memory_stats)
+    crew = create_crew(user_input, fanizhi_input, memory_stats, today_str)
 
     # 执行
     result = crew.kickoff()
